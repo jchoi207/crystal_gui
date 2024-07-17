@@ -29,7 +29,6 @@ import time
 
 matplotlib.use('Qt5Agg')
 
-
 make_copy = False
 
 
@@ -53,7 +52,7 @@ class FigurePlot(QWidget):
     def ui(self, *args, **kwargs):
         # INSTRUCTIONS
         self.curr_file = QLabel(
-            "Please browse for a file to display\n\nNote, selecting 'Trash', will delete the \nimage you've currently selected. \nToggling 'Copy File' before browsing for a pattern\n will make a copy of the file.", self)
+            "Please browse for a file to display\n\nNote, selecting 'Trash', will delete the \nimage you've currently selected. \n\nToggling 'Copy File' before browsing for a pattern\n will make a copy of the file.", self)
         self.curr_file.adjustSize()
         self.curr_file.setStyleSheet(
             '''
@@ -188,6 +187,7 @@ class FigurePlot(QWidget):
 
             version = 0
             trash_path = os.path.join(os.path.dirname(self.path), "trash")
+
             if not os.path.exists(trash_path):
                 os.makedirs(trash_path)
 
@@ -200,8 +200,7 @@ class FigurePlot(QWidget):
 
             copy_path = os.path.join(
                 trash_path, split_path + f"_copy_{version}.hp")
-            self.print_terminal(f"Making a copy at: {
-                                os.path.relpath(copy_path)}")
+            self.print_terminal(f"Making a copy at: {os.path.relpath(copy_path)}")
             shutil.copy(file, copy_path)
             self.delay(3)
 
@@ -235,15 +234,13 @@ class FigurePlot(QWidget):
                 self.curr_idx += 1
                 if self.curr_idx == self.len:
                     self.curr_idx = 0
-                self.print_terminal(f"1 forward\n>> Pattern {
-                                    self.curr_idx+1}/{self.len}")
+                self.print_terminal(f"1 forward\n>> Pattern {self.curr_idx+1}/{self.len}")
 
             else:
                 self.curr_idx -= 1
                 if self.curr_idx == -1:
                     self.curr_idx = self.len - 1
-                self.print_terminal(f"1 back\n>> Pattern {
-                                    self.curr_idx+1}/{self.len}")
+                self.print_terminal(f"1 back\n>> Pattern {self.curr_idx+1}/{self.len}")
             self.plot_graph()
 
     def close_mainwindow(self):
