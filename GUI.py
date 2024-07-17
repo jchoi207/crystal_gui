@@ -1,47 +1,114 @@
-from PySide6 import QtGui 
+from PySide6.QtWidgets import (QApplication,
+                               QWidget,
+                               QInputDialog,
+                               QLineEdit,
+                               QFileDialog,
+                               QPushButton,
+                               QVBoxLayout,
+                               QHBoxLayout,
+                               QLabel,
+                               QGridLayout
+                               )
+import h5py
+from PySide6.QtCore import QTimer, QEventLoop
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from PySide6.QtWidgets import QMainWindow, QApplication
+from PySide6 import QtGui
 import matplotlib
 import matplotlib.pyplot as plt
 import sys
 import shutil
 import os
+import time
 
 matplotlib.use('Qt5Agg')
-from PySide6.QtWidgets import QMainWindow, QApplication
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
-from matplotlib.patches import Circle
-from matplotlib import pyplot as plt
-import numpy as np
-from PySide6.QtWidgets import (QApplication, 
-                               QWidget, 
-                               QInputDialog, 
-                               QLineEdit, 
-                               QFileDialog, 
-                               QPushButton, 
-                               QVBoxLayout,
-                               QHBoxLayout
-                               )
-import h5py
+
+make_copy = False
+
 
 class FigurePlot(QWidget):
     def __init__(self, parent=None, width=5, height=4, dpi=200):
         super(FigurePlot, self).__init__(parent)
-        
-        self.fig = Figure(figsize=(width,height), dpi=dpi)
+
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.canvas = FigureCanvas(self.fig)
         self.axes = self.fig.add_subplot(111)
+
+        self.make_copy = False
         self.path = None
         self.curr_idx = 0
         self.all_patterns = None
         self.len = 0
+        self.output = ''
+
         self.ui()
-        
+
     def ui(self, *args, **kwargs):
-        # initialize buttons
+        # INSTRUCTIONS
+        self.curr_file = QLabel(
+            "Please browse for a file to display\n\nNote, selecting 'Trash', will delete the \nimage you've currently selected. \nToggling 'Copy File' before browsing for a pattern\n will make a copy of the file.", self)
+        self.curr_file.adjustSize()
+        self.curr_file.setStyleSheet(
+            '''
+            color: #E8E8E8;
+            background-color: #2C2C2C;
+            margin: 20px;
+            padding: 20px;
+            width: 100px;
+            height: 120px;
+            border: 3px solid #A0A0A0;
+            border-radius: 10px;
+            font-size: 13pt;
+            '''
+        )
+        self.curr_file.setFixedSize(500, 300)
+
+        # TERMINAL
+        self.terminal = QLabel(f">>{self.output}")
+        self.terminal.setStyleSheet(
+            '''
+            color: #E8E8E8;
+            background-color: #2C2C2C;
+            margin: 20px;
+            padding: 20px;
+            width: 100px;
+            height: 120px;
+            border: 3px solid #A0A0A0;
+            border-radius: 10px;
+            font-size: 13pt;
+            '''
+        )
+        self.terminal.setFixedSize(500, 150)
+
+        text_layout = QVBoxLayout()
+        text_layout.addWidget(self.curr_file)
+        text_layout.addWidget(self.terminal)
+
+        # TOGGLE
+        self.button0 = QPushButton('Copy File')
+        self.button0.toggled.connect(self.copy_file)
+        self.button0.setFixedSize(100, 40)
+        self.button0.setCheckable(True)
+        self.button0.setStyleSheet(  # green
+            '''
+            background: #2ed573;
+            color: white;
+            border: 1px solid white;
+            border-radius: 5px;
+            '''
+        )
+
+        toggle_layout = QGridLayout()
+        toggle_layout.addWidget(self.button0, 0, 0)
+
+        # BUTTONS
         self.button1 = QPushButton('Browse')
         self.button1.clicked.connect(self.open_file)
         self.button2 = QPushButton('Plot')
@@ -54,76 +121,143 @@ class FigurePlot(QWidget):
         self.button5.clicked.connect(self.close_mainwindow)
         self.button6 = QPushButton('Trash')
         self.button6.clicked.connect(self.delete_graph)
-        
-        # setup layout
-        layout = QHBoxLayout()
-        layout.addWidget(self.canvas)
-        layout.addWidget(self.button1)
-        layout.addWidget(self.button2)
-        layout.addWidget(self.button3)
-        layout.addWidget(self.button4)
-        layout.addWidget(self.button5)
-        layout.addWidget(self.button6)
-        
-        self.setLayout(layout)
-        
+
+        buttons = [self.button1, self.button2, self.button3,
+                   self.button4, self.button5, self.button6]
+        for button in buttons:
+            button.setFixedSize(100, 40)
+            button.setStyleSheet(  # blue
+                '''
+                background: #1e90ff;
+                color: white;
+                border: 1px solid white;
+                border-radius: 5px;
+                '''
+            )
+
+        button_layout = QGridLayout()
+        button_layout.addWidget(self.button1, 0, 0)
+        button_layout.addWidget(self.button2, 0, 1)
+        button_layout.addWidget(self.button3, 1, 0)
+        button_layout.addWidget(self.button4, 1, 1)
+        button_layout.addWidget(self.button5, 2, 0)
+        button_layout.addWidget(self.button6, 2, 1)
+        self.button5.setStyleSheet(
+            '''
+            background: #ff4757;
+            color: white;
+            border: 1px solid white;
+            border-radius: 5px;
+            '''
+        )
+        self.button6.setStyleSheet(  # red
+            '''
+            background: #ff4757;
+            color: white;
+            border: 1px solid white;
+            border-radius: 5px;
+            '''
+        )
+
+        # COMBINING UI LAYOUTS
+        ui_layout = QVBoxLayout()
+        ui_layout.addLayout(text_layout)
+        ui_layout.addLayout(toggle_layout)
+        ui_layout.addLayout(button_layout)
+
+        # COMBINING UI WITH CANVAS
+        main_layout = QHBoxLayout()
+        main_layout.addWidget(self.canvas)
+        main_layout.addLayout(ui_layout)
+
+        self.setLayout(main_layout)
+        # self.setLayout(button_layout)
+        # self.setLayout
+
     def open_file(self, *args, **kwargs):
+        self.print_terminal(f"Browsing")
         opts = QFileDialog.Options()
         opts |= QFileDialog.DontUseNativeDialog
         file, _ = QFileDialog.getOpenFileName(self,
-            "QFileDialog.getOpenFileName()", 
-            "","All Files (*);;Python Files (*.py)", 
-            options=opts)
+                                              "QFileDialog.getOpenFileName()",
+                                              "", "All Files (*);;Python Files (*.py)",
+                                              options=opts)
         self.path = file
-        version = 0
 
-        split_path = self.path.split(".hp")[0]
-        copy_path = split_path + "_copy_0.hp"
+        if self.make_copy:
 
-        while os.path.exists(copy_path):
-            version += 1
-            copy_path = split_path + f"_trash_{version}.hp"
-            
-        copy_path = split_path + f"_trash_{version}.hp"
-        shutil.copy(file, copy_path)
+            version = 0
+            trash_path = os.path.join(os.path.dirname(self.path), "trash")
+            if not os.path.exists(trash_path):
+                os.makedirs(trash_path)
+
+            split_path = os.path.basename(self.path).split(".hp")[0]
+            copy_path = os.path.join(trash_path, split_path + "_copy_0.hp")
+            while os.path.exists(copy_path):
+                version += 1
+                copy_path = os.path.join(
+                    trash_path, split_path + f"_copy_{version}.hp")
+
+            copy_path = os.path.join(
+                trash_path, split_path + f"_copy_{version}.hp")
+            self.print_terminal(f"Making a copy at: {
+                                os.path.relpath(copy_path)}")
+            shutil.copy(file, copy_path)
+            self.delay(3)
+
+        self.print_terminal(f"Opened file at: {os.path.relpath(
+            self.path)}\n>> Click 'Plot' to view")
+
+    def copy_file(self):
+        self.make_copy = not self.make_copy
+        self.print_terminal(f"Toggle Copy: {self.make_copy}")
 
     def init_graph(self, *args, **kwargs):
         if self.path:
             with h5py.File(self.path, 'a') as f:
                 self.all_patterns = f['diffraction']['micrograph'][:]
                 self.len = len(self.all_patterns)
-                print(f"Number of files: {self.len}")
                 self.plot_graph()
-    
+                self.print_terminal(f"Plotted {os.path.relpath(
+                    self.path)}\n>> Number of patterns: {self.len}")
+
     def plot_graph(self, *args, **kwargs):
         if self.len > 0:
             self.curr_pattern = self.all_patterns[self.curr_idx]
             self.axes.clear()
             self.axes.imshow(self.curr_pattern, cmap='gray')
-            self.axes.set_title(f"Electron Diffraction Pattern {self.curr_idx + 1} of {self.len}")
+            self.axes.set_title(f" Pattern {self.curr_idx + 1}/{self.len}")
             self.canvas.draw()
-    
+
     def next_graph(self, next: bool = None, *args, **kwargs):
         if next is not None:
             if next:
                 self.curr_idx += 1
                 if self.curr_idx == self.len:
                     self.curr_idx = 0
+                self.print_terminal(f"1 forward\n>> Pattern {
+                                    self.curr_idx+1}/{self.len}")
+
             else:
                 self.curr_idx -= 1
                 if self.curr_idx == -1:
                     self.curr_idx = self.len - 1
+                self.print_terminal(f"1 back\n>> Pattern {
+                                    self.curr_idx+1}/{self.len}")
             self.plot_graph()
-    
+
     def close_mainwindow(self):
+        self.terminal.setText(">> Closing Application :)")
+        self.delay(0.5)
         main_window = self.window()
         if isinstance(main_window, QMainWindow):
             main_window.close()
-    
+
     def delete_graph(self, *args, **kwargs):
         if self.len > 0:
             with h5py.File(self.path, 'a') as f:
                 patterns = f['diffraction']['micrograph'][:]
+                deleted_index = self.curr_idx
                 new_data = np.delete(patterns, self.curr_idx, axis=0)
                 del f['diffraction']['micrograph']
                 f.create_dataset('diffraction/micrograph', data=new_data)
@@ -131,17 +265,37 @@ class FigurePlot(QWidget):
                 self.len = len(self.all_patterns)
                 if self.curr_idx >= self.len:
                     self.curr_idx = 0
+                self.print_terminal(
+                    f"Deleted image at index {deleted_index+1}")
                 self.plot_graph()
 
-        
+    def delay(self, seconds):
+        timer = QTimer()
+        timer.setSingleShot(True)
+        loop = QEventLoop()
+        timer.timeout.connect(loop.quit)
+        timer.start(seconds * 1000)
+        loop.exec_()
+
+    def print_terminal(self, message, seconds=0.025):
+
+        self.output = f">> {message}"
+        print(self.output)
+        self.delay(seconds)
+        self.terminal.setText(">>")
+        self.delay(seconds)
+        self.terminal.setText(self.output)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
         self.title = "Plot"
         self.setWindowTitle(self.title)
-        self.plot = FigurePlot(self, width =5, height =5, dpi=200)
+        self.plot = FigurePlot(self, width=15, height=15, dpi=200)
         self.setCentralWidget(self.plot)
-        
+
+
 app = QApplication.instance()
 if app is None:
     app = QApplication(sys.argv)

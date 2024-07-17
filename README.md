@@ -1,5 +1,3 @@
 ## GUI for .hp files
-- Run main.py to start the GUI
-- TODO:
-    - Browse button leads to multiple copies of the same file
-    - Combine browse and plot without copying files
+- Instead of parsing through individual '''.hp''' files, this GUI allows you to view the entire database in a more user-friendly manner. 
+- The user can trash individual images. Note these files are recoverable if the user copies the '''.hp''' file before trashing. 
