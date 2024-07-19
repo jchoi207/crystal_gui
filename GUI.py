@@ -7,10 +7,15 @@ from PySide6.QtWidgets import (QApplication,
                                QVBoxLayout,
                                QHBoxLayout,
                                QLabel,
-                               QGridLayout
+                               QGridLayout,
+                               QFormLayout
                                )
 import h5py
-from PySide6.QtCore import QTimer, QEventLoop
+from PySide6.QtCore import QTimer, QEventLoop, Qt
+
+from PySide6.QtGui import QIntValidator
+
+
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle
@@ -46,13 +51,15 @@ class FigurePlot(QWidget):
         self.all_patterns = None
         self.len = 0
         self.output = ''
+        self.min_norm = 3
+        self.max_norm = 99
 
         self.ui()
 
     def ui(self, *args, **kwargs):
         # INSTRUCTIONS
         self.curr_file = QLabel(
-            "Please browse for a file to display\n\nNote, selecting 'Trash', will delete the \nimage you've currently selected. \n\nToggling 'Copy File' before browsing for a pattern\n will make a copy of the file.", self)
+            "Please browse for a file to display\n\nNote, selecting 'Trash', will delete the \nimage you've currently selected. \n\nToggling 'Copy File' before browsing for a pattern\n will make a copy of the file. \n\n You can adjust the input intensities to change the contrast.", self)
         self.curr_file.adjustSize()
         self.curr_file.setStyleSheet(
             '''
@@ -107,6 +114,56 @@ class FigurePlot(QWidget):
         toggle_layout = QGridLayout()
         toggle_layout.addWidget(self.button0, 0, 0)
 
+        # VMIN and VMAX INPUT FIELDS
+
+        self.min_line_edit = QLineEdit(parent=self)
+        self.min_line_edit.setValidator(QIntValidator())
+        self.min_line_edit.setText("3")
+
+        self.max_line_edit = QLineEdit(parent=self)
+        self.max_line_edit.setValidator(QIntValidator())
+        self.max_line_edit.setText("99")
+        
+        self.min_norm = np.clip(int(self.min_line_edit.text()), 0, 100)
+        self.max_norm = np.clip(int(self.max_line_edit.text()), 0, 100)
+
+        self.min_line_edit.setStyleSheet(
+            '''
+            min-width: 125px;
+            max-width: 125px;
+            background: light-gray;
+            margin-right:+25px;
+            '''
+        )
+        self.max_line_edit.setStyleSheet(
+            '''
+            min-width: 125px;
+            max-width: 125px;
+            background: light-gray;
+            margin-right:+25px;
+            '''
+        )
+
+        edit_layout = QGridLayout()
+        # Adjust horizontal spacing as needed
+        edit_layout.setHorizontalSpacing(5)
+
+        min_label = QLabel(parent=self, text="Normalized min [0-100]")
+        max_label = QLabel(parent=self, text="Normalized max [0-100]")
+
+        # Adding some negative margin to the right of the labels
+        min_label.setStyleSheet("margin-right: +25px;")
+        max_label.setStyleSheet("margin-right: +25px;")
+
+        edit_layout.addWidget(
+            min_label, 0, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        edit_layout.addWidget(self.min_line_edit, 0, 1,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        edit_layout.addWidget(
+            max_label, 1, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        edit_layout.addWidget(self.max_line_edit, 1, 1,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+
         # BUTTONS
         self.button1 = QPushButton('Browse')
         self.button1.clicked.connect(self.open_file)
@@ -157,11 +214,11 @@ class FigurePlot(QWidget):
             border-radius: 5px;
             '''
         )
-
         # COMBINING UI LAYOUTS
         ui_layout = QVBoxLayout()
         ui_layout.addLayout(text_layout)
         ui_layout.addLayout(toggle_layout)
+        ui_layout.addLayout(edit_layout)
         ui_layout.addLayout(button_layout)
 
         # COMBINING UI WITH CANVAS
@@ -200,7 +257,8 @@ class FigurePlot(QWidget):
 
             copy_path = os.path.join(
                 trash_path, split_path + f"_copy_{version}.hp")
-            self.print_terminal(f"Making a copy at: {os.path.relpath(copy_path)}")
+            self.print_terminal(f"Making a copy at: {
+                                os.path.relpath(copy_path)}")
             shutil.copy(file, copy_path)
             self.delay(3)
 
@@ -218,29 +276,43 @@ class FigurePlot(QWidget):
                 self.len = len(self.all_patterns)
                 self.plot_graph()
                 self.print_terminal(f"Plotted {os.path.relpath(
-                    self.path)}\n>> Number of patterns: {self.len}")
+                    self.path)}\n>> Number of patterns: {self.len}\n>> Input Intensities{sorted([self.min_norm, self.max_norm])}")
 
     def plot_graph(self, *args, **kwargs):
+
+        self.min_norm = np.clip(int(self.min_line_edit.text()), 0, 100)
+        self.max_norm = np.clip(int(self.max_line_edit.text()), 0, 100)
+        
         if self.len > 0:
             self.curr_pattern = self.all_patterns[self.curr_idx]
             self.axes.clear()
-            self.axes.imshow(self.curr_pattern, cmap='gray')
+
+            vmin = np.percentile(self.curr_pattern, min(
+                self.min_norm, self.max_norm))
+            vmax = np.percentile(self.curr_pattern, max(
+                self.min_norm, self.max_norm))
+            self.axes.imshow(self.curr_pattern, cmap='gray',
+                             vmin=vmin, vmax=vmax)
             self.axes.set_title(f" Pattern {self.curr_idx + 1}/{self.len}")
             self.canvas.draw()
 
     def next_graph(self, next: bool = None, *args, **kwargs):
+        self.min_norm = np.clip(int(self.min_line_edit.text()), 0, 100)
+        self.max_norm = np.clip(int(self.max_line_edit.text()), 0, 100)
         if next is not None:
             if next:
                 self.curr_idx += 1
                 if self.curr_idx == self.len:
                     self.curr_idx = 0
-                self.print_terminal(f"1 forward\n>> Pattern {self.curr_idx+1}/{self.len}")
+                self.print_terminal(f"1 forward\n>> Pattern {
+                                    self.curr_idx+1}/{self.len}\n>> Input Intensities{sorted([self.min_norm, self.max_norm])}")
 
             else:
                 self.curr_idx -= 1
                 if self.curr_idx == -1:
                     self.curr_idx = self.len - 1
-                self.print_terminal(f"1 back\n>> Pattern {self.curr_idx+1}/{self.len}")
+                self.print_terminal(f"1 back\n>> Pattern {
+                                    self.curr_idx+1}/{self.len}\n>> Inputs Intensities{sorted([self.min_norm, self.max_norm])}")
             self.plot_graph()
 
     def close_mainwindow(self):
@@ -272,10 +344,9 @@ class FigurePlot(QWidget):
         loop = QEventLoop()
         timer.timeout.connect(loop.quit)
         timer.start(seconds * 1000)
-        loop.exec_()
+        loop.exec()
 
     def print_terminal(self, message, seconds=0.025):
-
         self.output = f">> {message}"
         print(self.output)
         self.delay(seconds)
