@@ -10,32 +10,29 @@ from PySide6.QtWidgets import (QApplication,
                                QGridLayout,
                                QFormLayout
                                )
-import h5py
 from PySide6.QtCore import QTimer, QEventLoop, Qt
-
 from PySide6.QtGui import QIntValidator
+from PySide6.QtWidgets import QMainWindow, QApplication
+from PySide6 import QtGui
 
-
-import numpy as np
-from matplotlib import pyplot as plt
+import matplotlib
+import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from PySide6.QtWidgets import QMainWindow, QApplication
-from PySide6 import QtGui
-import matplotlib
-import matplotlib.pyplot as plt
+
+import numpy as np
+
+import h5py
 import sys
 import shutil
 import os
 import time
 
 matplotlib.use('Qt5Agg')
-
 make_copy = False
-
 
 class FigurePlot(QWidget):
     def __init__(self, parent=None, width=5, height=4, dpi=200):
