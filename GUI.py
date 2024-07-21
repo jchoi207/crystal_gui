@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QApplication,
                                QFormLayout
                                )
 from PySide6.QtCore import QTimer, QEventLoop, Qt
-from PySide6.QtGui import QIntValidator
+from PySide6.QtGui import QIntValidator, QDoubleValidator
 from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6 import QtGui
 
@@ -33,6 +33,7 @@ import time
 
 matplotlib.use('Qt5Agg')
 make_copy = False
+
 
 class FigurePlot(QWidget):
     def __init__(self, parent=None, width=5, height=4, dpi=200):
@@ -114,21 +115,22 @@ class FigurePlot(QWidget):
         # VMIN and VMAX INPUT FIELDS
 
         self.min_line_edit = QLineEdit(parent=self)
-        self.min_line_edit.setValidator(QIntValidator())
-        self.min_line_edit.setText("3")
+        self.min_line_edit.setValidator(QDoubleValidator())
+        self.min_line_edit.setText("3.5")
 
         self.max_line_edit = QLineEdit(parent=self)
-        self.max_line_edit.setValidator(QIntValidator())
-        self.max_line_edit.setText("99")
-        
-        self.min_norm = np.clip(int(self.min_line_edit.text()), 0, 100)
-        self.max_norm = np.clip(int(self.max_line_edit.text()), 0, 100)
+        self.max_line_edit.setValidator(QDoubleValidator())
+        self.max_line_edit.setText("99.5")
+
+        self.min_norm = np.clip(float(self.min_line_edit.text()), 0, 100)
+        self.max_norm = np.clip(float(self.max_line_edit.text()), 0, 100)
 
         self.min_line_edit.setStyleSheet(
             '''
             min-width: 125px;
             max-width: 125px;
-            background: light-gray;
+            color: white;
+            background: black;
             margin-right:+25px;
             '''
         )
@@ -136,7 +138,8 @@ class FigurePlot(QWidget):
             '''
             min-width: 125px;
             max-width: 125px;
-            background: light-gray;
+            color: white;
+            background: black;
             margin-right:+25px;
             '''
         )
@@ -277,9 +280,9 @@ class FigurePlot(QWidget):
 
     def plot_graph(self, *args, **kwargs):
 
-        self.min_norm = np.clip(int(self.min_line_edit.text()), 0, 100)
-        self.max_norm = np.clip(int(self.max_line_edit.text()), 0, 100)
-        
+        self.min_norm = np.clip(float(self.min_line_edit.text()), 0, 100)
+        self.max_norm = np.clip(float(self.max_line_edit.text()), 0, 100)
+
         if self.len > 0:
             self.curr_pattern = self.all_patterns[self.curr_idx]
             self.axes.clear()
@@ -294,8 +297,8 @@ class FigurePlot(QWidget):
             self.canvas.draw()
 
     def next_graph(self, next: bool = None, *args, **kwargs):
-        self.min_norm = np.clip(int(self.min_line_edit.text()), 0, 100)
-        self.max_norm = np.clip(int(self.max_line_edit.text()), 0, 100)
+        self.min_norm = np.clip(float(self.min_line_edit.text()), 0, 100)
+        self.max_norm = np.clip(float(self.max_line_edit.text()), 0, 100)
         if next is not None:
             if next:
                 self.curr_idx += 1
