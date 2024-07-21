@@ -11,4 +11,4 @@
 > Using ```Trash``` will delete the current image you are viewing. This is irreversible unless you toggle the ```Copy``` button before plotting your dataset.
 
 \
-![GUI](gitignore/demo.png)
+![GUI](img/demo.png)
