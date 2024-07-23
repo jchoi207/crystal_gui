@@ -57,7 +57,7 @@ class FigurePlot(QWidget):
     def ui(self, *args, **kwargs):
         # INSTRUCTIONS
         self.curr_file = QLabel(
-            "Please browse for a file to display\n\nNote, selecting 'Trash', will delete the \nimage you've currently selected. \n\nToggling 'Copy File' before browsing for a pattern\n will make a copy of the file. \n\n You can adjust the input intensities to change the contrast.", self)
+            "Browse for a file to display\n\'Trash' deletes the selected image\n\nToggling 'Copy File' before browsing for a pattern\n will make a copy of the file. \n\n Adjust the min/max intensities \nto vary the contrast.", self)
         self.curr_file.adjustSize()
         self.curr_file.setStyleSheet(
             '''
@@ -72,8 +72,24 @@ class FigurePlot(QWidget):
             font-size: 13pt;
             '''
         )
-        self.curr_file.setFixedSize(500, 300)
+        self.curr_file.setFixedSize(400, 250)
 
+        # CURRENT FILENAME
+        self.filename_display = QLabel(f">> {self.path}")
+        self.filename_display.setStyleSheet(
+            '''
+            color: #E8E8E8;
+            background-color: #2C2C2C;
+            margin: 20px;
+            padding:20px;
+            width: 100px;
+            height: 70px;
+            border: 3px solid #A0A0A0;
+            border-radius: 10px;
+            font-size: 13pt;
+            '''
+        )
+        self.filename_display.setFixedSize(400, 112)
         # TERMINAL
         self.terminal = QLabel(f">>{self.output}")
         self.terminal.setStyleSheet(
@@ -89,10 +105,11 @@ class FigurePlot(QWidget):
             font-size: 13pt;
             '''
         )
-        self.terminal.setFixedSize(500, 150)
+        self.terminal.setFixedSize(400, 150)
 
         text_layout = QVBoxLayout()
         text_layout.addWidget(self.curr_file)
+        text_layout.addWidget(self.filename_display)
         text_layout.addWidget(self.terminal)
 
         # TOGGLE
@@ -117,10 +134,12 @@ class FigurePlot(QWidget):
         self.min_line_edit = QLineEdit(parent=self)
         self.min_line_edit.setValidator(QDoubleValidator())
         self.min_line_edit.setText("3.5")
+        self.min_line_edit.textChanged.connect(self.on_text_changed)
 
         self.max_line_edit = QLineEdit(parent=self)
         self.max_line_edit.setValidator(QDoubleValidator())
         self.max_line_edit.setText("99.5")
+        self.max_line_edit.textChanged.connect(self.on_text_changed)
 
         self.min_norm = np.clip(float(self.min_line_edit.text()), 0, 100)
         self.max_norm = np.clip(float(self.max_line_edit.text()), 0, 100)
@@ -230,6 +249,10 @@ class FigurePlot(QWidget):
         # self.setLayout(button_layout)
         # self.setLayout
 
+    def on_text_changed(self):
+        sender = self.sender()
+        self.plot_graph()
+
     def open_file(self, *args, **kwargs):
         self.print_terminal(f"Browsing")
         opts = QFileDialog.Options()
@@ -239,6 +262,7 @@ class FigurePlot(QWidget):
                                               "", "All Files (*);;Python Files (*.py)",
                                               options=opts)
         self.path = file
+        self.print_filename()
 
         if self.make_copy:
 
@@ -260,9 +284,12 @@ class FigurePlot(QWidget):
             self.print_terminal(f"Making a copy at: {
                                 os.path.relpath(copy_path)}")
             shutil.copy(file, copy_path)
-            self.delay(3)
+            self.delay(1.5)
 
-        self.print_terminal(f"Opened file at: {os.path.relpath(
+        self.axes.clear()
+        self.canvas.draw()
+        self.print_filename()
+        self.print_terminal(f"Opened {os.path.relpath(
             self.path)}\n>> Click 'Plot' to view")
 
     def copy_file(self):
@@ -272,11 +299,12 @@ class FigurePlot(QWidget):
     def init_graph(self, *args, **kwargs):
         if self.path:
             with h5py.File(self.path, 'a') as f:
+                self.curr_idx = 0
                 self.all_patterns = f['diffraction']['micrograph'][:]
                 self.len = len(self.all_patterns)
                 self.plot_graph()
                 self.print_terminal(f"Plotted {os.path.relpath(
-                    self.path)}\n>> Number of patterns: {self.len}\n>> Input Intensities{sorted([self.min_norm, self.max_norm])}")
+                    self.path)}\n>> Number of patterns: {self.len}")
 
     def plot_graph(self, *args, **kwargs):
 
@@ -354,11 +382,17 @@ class FigurePlot(QWidget):
         self.delay(seconds)
         self.terminal.setText(self.output)
 
+    def print_filename(self):
+        p = os.path.relpath(self.path)
+        print(f">> Current File: {p}")
+        self.filename_display.setText(f">> Current File: {p}")
+
 
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-        self.title = "Plot"
+        self.showFullScreen()
+        self.title = "Serial Electron Diffraction GUI"
         self.setWindowTitle(self.title)
         self.plot = FigurePlot(self, width=15, height=15, dpi=200)
         self.setCentralWidget(self.plot)
