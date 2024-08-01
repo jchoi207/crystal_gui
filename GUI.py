@@ -44,6 +44,7 @@ class FigurePlot(QWidget):
         self.axes = self.fig.add_subplot(111)
 
         self.make_copy = False
+        self.plotted = False
         self.path = None
         self.curr_idx = 0
         self.all_patterns = None
@@ -51,9 +52,22 @@ class FigurePlot(QWidget):
         self.output = ''
         self.min_norm = 3
         self.max_norm = 99
+        self.setFocusPolicy(Qt.StrongFocus)  # Ensure the window can receive focus
+
 
         self.ui()
-
+    def keyPressEvent(self, event):
+        if self.plotted:
+            if event.key() == Qt.Key_Left: 
+                print(">> Left")
+                self.next_graph(next=False)
+            if event.key() == Qt.Key_Right: 
+                print(">> Right")
+                self.next_graph(next=True)
+            if event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace: 
+                print(">> Deleting graph")
+                self.delete_graph()
+                
     def ui(self, *args, **kwargs):
         # INSTRUCTIONS
         self.curr_file = QLabel(
@@ -135,11 +149,13 @@ class FigurePlot(QWidget):
         self.min_line_edit.setValidator(QDoubleValidator())
         self.min_line_edit.setText("3.5")
         self.min_line_edit.textChanged.connect(self.on_text_changed)
-
+        self.min_line_edit.setFocusPolicy(Qt.ClickFocus)
+        
         self.max_line_edit = QLineEdit(parent=self)
         self.max_line_edit.setValidator(QDoubleValidator())
         self.max_line_edit.setText("99.5")
         self.max_line_edit.textChanged.connect(self.on_text_changed)
+        self.max_line_edit.setFocusPolicy(Qt.ClickFocus)
 
         self.min_norm = np.clip(float(self.min_line_edit.text()), 0, 100)
         self.max_norm = np.clip(float(self.max_line_edit.text()), 0, 100)
@@ -182,12 +198,12 @@ class FigurePlot(QWidget):
             max_label, 1, 0, alignment=Qt.AlignmentFlag.AlignRight)
         edit_layout.addWidget(self.max_line_edit, 1, 1,
                               alignment=Qt.AlignmentFlag.AlignLeft)
-
+        
         # BUTTONS
         self.button1 = QPushButton('Browse')
         self.button1.clicked.connect(self.open_file)
-        self.button2 = QPushButton('Plot')
-        self.button2.clicked.connect(self.init_graph)
+        self.button2 = QPushButton('Copy File')
+        self.button2.toggled.connect(self.copy_file)
         self.button3 = QPushButton('<-')
         self.button3.clicked.connect(lambda: self.next_graph(False))
         self.button4 = QPushButton('->')
@@ -209,7 +225,17 @@ class FigurePlot(QWidget):
                 border-radius: 5px;
                 '''
             )
-
+        self.button2.setCheckable(True)
+        self.button2.setStyleSheet(  # green
+            '''
+            background: #2ed573;
+            color: white;
+            border: 1px solid white;
+            border-radius: 5px;
+            '''
+        )
+        
+        
         button_layout = QGridLayout()
         button_layout.addWidget(self.button1, 0, 0)
         button_layout.addWidget(self.button2, 0, 1)
@@ -236,7 +262,6 @@ class FigurePlot(QWidget):
         # COMBINING UI LAYOUTS
         ui_layout = QVBoxLayout()
         ui_layout.addLayout(text_layout)
-        ui_layout.addLayout(toggle_layout)
         ui_layout.addLayout(edit_layout)
         ui_layout.addLayout(button_layout)
 
@@ -248,6 +273,10 @@ class FigurePlot(QWidget):
         self.setLayout(main_layout)
         # self.setLayout(button_layout)
         # self.setLayout
+        # QEvent.KeyPress
+
+
+
 
     def on_text_changed(self):
         sender = self.sender()
@@ -281,16 +310,15 @@ class FigurePlot(QWidget):
 
             copy_path = os.path.join(
                 trash_path, split_path + f"_copy_{version}.hp")
-            self.print_terminal(f"Making a copy at: {
-                                os.path.relpath(copy_path)}")
+            self.print_terminal(f"Making a copy at: {os.path.relpath(copy_path)}")
             shutil.copy(file, copy_path)
-            self.delay(1.5)
+            self.delay(0.5)
 
         self.axes.clear()
         self.canvas.draw()
         self.print_filename()
-        self.print_terminal(f"Opened {os.path.relpath(
-            self.path)}\n>> Click 'Plot' to view")
+        self.print_terminal(f"Opened {os.path.relpath(self.path)}")   # \n>> Click 'Plot' to view")
+        self.init_graph()
 
     def copy_file(self):
         self.make_copy = not self.make_copy
@@ -303,8 +331,8 @@ class FigurePlot(QWidget):
                 self.all_patterns = f['diffraction']['micrograph'][:]
                 self.len = len(self.all_patterns)
                 self.plot_graph()
-                self.print_terminal(f"Plotted {os.path.relpath(
-                    self.path)}\n>> Number of patterns: {self.len}")
+                self.print_terminal(f"Plotted {os.path.relpath(self.path)}\n>> Number of patterns: {self.len}")
+                self.plotted = True
 
     def plot_graph(self, *args, **kwargs):
 
@@ -319,28 +347,30 @@ class FigurePlot(QWidget):
                 self.min_norm, self.max_norm))
             vmax = np.percentile(self.curr_pattern, max(
                 self.min_norm, self.max_norm))
-            self.axes.imshow(self.curr_pattern, cmap='gray',
+            self.axes.imshow(self.curr_pattern, cmap='viridis',
                              vmin=vmin, vmax=vmax)
             self.axes.set_title(f" Pattern {self.curr_idx + 1}/{self.len}")
+            # self.figure.colorbar(im, ax=self.axes)
             self.canvas.draw()
 
     def next_graph(self, next: bool = None, *args, **kwargs):
         self.min_norm = np.clip(float(self.min_line_edit.text()), 0, 100)
         self.max_norm = np.clip(float(self.max_line_edit.text()), 0, 100)
         if next is not None:
-            if next:
+            if self.len == 1:
+                self.print_terminal(f"There is only one pattern left.\n>> Pattern 1/1")
+                self.curr_idx = 0
+            elif next:
                 self.curr_idx += 1
                 if self.curr_idx == self.len:
                     self.curr_idx = 0
-                self.print_terminal(f"1 forward\n>> Pattern {
-                                    self.curr_idx+1}/{self.len}\n>> Input Intensities{sorted([self.min_norm, self.max_norm])}")
+                self.print_terminal(f"1 forward\n>> Pattern {self.curr_idx+1}/{self.len}\n>> Input Intensities{sorted([self.min_norm, self.max_norm])}")
 
             else:
                 self.curr_idx -= 1
                 if self.curr_idx == -1:
                     self.curr_idx = self.len - 1
-                self.print_terminal(f"1 back\n>> Pattern {
-                                    self.curr_idx+1}/{self.len}\n>> Inputs Intensities{sorted([self.min_norm, self.max_norm])}")
+                self.print_terminal(f"1 back\n>> Pattern {self.curr_idx+1}/{self.len}\n>> Inputs Intensities{sorted([self.min_norm, self.max_norm])}")
             self.plot_graph()
 
     def close_mainwindow(self):
@@ -351,7 +381,7 @@ class FigurePlot(QWidget):
             main_window.close()
 
     def delete_graph(self, *args, **kwargs):
-        if self.len > 0:
+        if self.len > 1:
             with h5py.File(self.path, 'a') as f:
                 patterns = f['diffraction']['micrograph'][:]
                 deleted_index = self.curr_idx
@@ -365,6 +395,10 @@ class FigurePlot(QWidget):
                 self.print_terminal(
                     f"Deleted image at index {deleted_index+1}")
                 self.plot_graph()
+        else:
+            self.print_terminal(
+                "Cannot delete last file"
+            )
 
     def delay(self, seconds):
         timer = QTimer()
